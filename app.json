@@ -19,10 +19,31 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.anonymous.MediMate",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-barcode-scanner",
+      "@react-native-firebase/app"
+    ],
+    "expo-notifications": {
+      "icon": "./assets/favicon.png",
+      "color": "#ffffff",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notification} new messages"
+    },
+    "owner": "guzmancarlodave378",
+    "extra": {
+      "eas": {
+        "projectId": "aef56e4d-d70a-4b7f-9296-89d426b9d68a"
+      }
     }
   }
 }

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Button } from "react-native";
+import { View, Text, StyleSheet, Button , Image, Platform} from "react-native";
 import { Camera } from "expo-camera"; // Import expo-camera
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import jsQR from "jsqr";
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,6 +29,45 @@ export default function QrScanner({ route }) {
   if (hasPermission === false) {
     return <Text>No access to camera</Text>; // If permissions are denied
   }
+
+  const uploadQR = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+      base64: true, // We need base64 to decode it
+    });
+  
+    if (!result.canceled) {
+      const base64 = result.assets[0].base64;
+      const imageUri = result.assets[0].uri;
+  
+      // Decode the image manually using jsQR
+      const response = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+  
+      const image = await Image.getSize(imageUri, (width, height) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        img.src = `data:image/jpeg;base64,${response}`;
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            navigation.navigate("Drawer", { scannedUID: code.data });
+          } else {
+            alert("No QR code found in the image.");
+          }
+        };
+      });
+    }
+  };
+  
 
   const handleBarCodeScanned = ({ data }) => {
     setScanned(true);

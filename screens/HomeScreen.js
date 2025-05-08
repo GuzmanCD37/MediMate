@@ -354,26 +354,12 @@ export default function HomeScreen() {
                 {selectedMed.interval && (
                   <Text>Interval: {selectedMed.interval}</Text>
                 )}
-                <Text>Total Amount: {selectedMed.totalAmount}</Text>
+                <Text>Amount on-hand: {selectedMed.onHandAmount} pcs</Text>
                 <Button title="Close" onPress={() => setModalVisible(false)} />
                 <Button
                   title="Delete"
                   color="red"
                   onPress={() => confirmDelete(selectedMed.name)}
-                />
-
-                <Button
-                  title="Clear All Notifications"
-                  color="red"
-                  onPress={async () => {
-                    try {
-                      await Notifications.cancelAllScheduledNotificationsAsync();
-                      console.log("✅ All notifications cleared.");
-                      alert("All scheduled notifications have been cleared.");
-                    } catch (error) {
-                      console.error("❌ Failed to clear notifications:", error);
-                    }
-                  }}
                 />
               </>
             )}

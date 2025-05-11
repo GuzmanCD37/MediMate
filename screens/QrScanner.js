@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Button } from "react-native";
 import { Camera } from "expo-camera"; // Import expo-camera
-import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
+//import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
 import QRCodeLocalImage from "react-native-qrcode-local-image";
+import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -37,12 +38,15 @@ export default function QrScanner({ route }) {
     if (!result.canceled) {
       const imageUri = result.assets[0].uri;
 
-      QRCodeLocalImage.decode(imageUri, (err, result) => {
+      QRCodeLocalImage.decode(imageUri, (err, decoded) => {
         if (err) {
           alert("Failed to read QR code.");
+          console.error(err);
           return;
         }
-        navigation.navigate("Drawer", { scannedUID: result });
+
+        console.log("Decoded QR:", decoded);
+        navigation.navigate("Drawer", { scannedUID: decoded });
       });
     }
   };
@@ -55,19 +59,22 @@ export default function QrScanner({ route }) {
     <SafeAreaView style={styles.container}>
       <CameraView
         ref={cameraRef}
-        //barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        style={{ flex: 1 }}
+        style={StyleSheet.absoluteFill}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       >
-        <Button title="Upload QR from Gallery" onPress={uploadQR} />
         <View style={styles.overlay}>
-          {scanned ? (
-            <Button title="Scan Again" onPress={() => setScanned(false)} />
-          ) : (
-            <Text style={styles.scanText}>
-              Scan a QR Code to track the patient
-            </Text>
+          <View style={styles.scanBox} />
+          <Text style={styles.scanText}>
+            Scan a QR Code to track the patient
+          </Text>
+          {scanned && (
+            <Button
+              title="Scan Again"
+              style={styles.scanText}
+              onPress={() => setScanned(false)}
+            />
           )}
+          <Button title="Upload QR from Gallery" onPress={uploadQR} />
         </View>
       </CameraView>
     </SafeAreaView>
@@ -77,24 +84,28 @@ export default function QrScanner({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  camera: {
-    flex: 1,
-    width: "100%",
+    backgroundColor: "black",
   },
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    //backgroundColor: "rgba(0, 0, 0, 0.5)", // Slight dark overlay for better visibility
+    padding: 16,
+  },
+  scanBox: {
+    width: 250,
+    height: 250,
+    borderColor: "#white", // Green outline
+    borderWidth: 4,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   scanText: {
     color: "white",
-    padding: 100,
-    fontSize: 18,
-    textAlign: "center",
+    fontSize: 16,
+    marginVertical: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 10,
+    borderRadius: 8,
   },
 });

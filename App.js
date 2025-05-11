@@ -1,5 +1,6 @@
 //app.js
 import React, { useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { NavigationContainer } from "@react-navigation/native";
@@ -14,6 +15,7 @@ import RegisterScreen from "./screens/RegisterScreen";
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from "./screens/HomeScreen";
 import AddMedicationScreen from "./screens/AddMedicationScreen";
+import EditMedication from "./screens/EditMedicationScreen";
 import QrScanner from "./screens/QrScanner";
 import QrCodeScreen from "./screens/QrCodeScreen";
 
@@ -83,6 +85,7 @@ export async function checkIfStillActive(medId) {
 }
 
 export default function App() {
+  <StatusBar style={{ BackgroundColor: "black" }} />;
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
@@ -176,6 +179,7 @@ export default function App() {
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Drawer" component={DrawerRoutes} />
         <Stack.Screen name="AddMedication" component={AddMedicationScreen} />
+        <Stack.Screen name="EditMedication" component={EditMedication} />
         <Stack.Screen name="QrScanner" component={QrScanner} />
         <Stack.Screen name="PatientQRCode" component={QrCodeScreen} />
       </Stack.Navigator>

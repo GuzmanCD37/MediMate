@@ -18,11 +18,8 @@ export default function LoginScreen({ navigation }) {
         password
       );
 
-      await registerForPushNotifications(userCredential.user.uid); // Register for push notifications
+      //await registerForPushNotifications(userCredential.user.uid); // Register for push notifications
       console.log("User logged in:", userCredential.user.uid);
-      
-
-
 
       alert("Login successful!");
       navigation.navigate("Drawer"); // Navigate to the drawer after login

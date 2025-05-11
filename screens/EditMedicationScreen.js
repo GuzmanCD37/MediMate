@@ -1,6 +1,5 @@
-//AddMedicationScreen.js
-import React, { useState, useMemo, useEffect } from "react";
-import DropDownPicker from "react-native-dropdown-picker";
+import React, { useState, useEffect, useMemo } from "react";
+import { scheduleMedicationReminder } from "../utils/notifications";
 import {
   View,
   Text,
@@ -17,17 +16,9 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { auth, db } from "../firebase";
-import {
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  collection,
-  addDoc,
-} from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-export default function AddMedication({ navigation }) {
+export default function EditMedication({ navigation, route }) {
   const [medName, setMedName] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState(new Date());
@@ -44,14 +35,54 @@ export default function AddMedication({ navigation }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [calculatedTimes, setCalculatedTimes] = useState([]);
 
-  const [items, setItems] = useState([
-    { label: "1x a day", value: "1x a day" },
-    { label: "2x a day", value: "2x a day" },
-    { label: "3x a day", value: "3x a day" },
-    { label: "4x a day", value: "4x a day" },
-  ]);
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(frequency);
+  const { medId } = route.params;
+
+  useEffect(() => {
+    const fetchMedication = async () => {
+      const user = auth.currentUser;
+      if (!user || !medId) return;
+      console.log("Fetching medication with ID:", medId);
+      const parseTimeString = (timeStr) => {
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        const now = new Date();
+        now.setHours(hours, minutes, 0, 0);
+        return now;
+      };
+
+      try {
+        const medRef = doc(db, "medications", user.uid, "meds", medId);
+        const medSnap = await getDoc(medRef);
+
+        if (medSnap.exists()) {
+          const medication = medSnap.data();
+          setMedName(medication.name || "");
+          setDescription(medication.description || "");
+          setStartDate(new Date(medication.startDate));
+
+          // 👇 Fix for time string like "11:05"
+          setStartTime(
+            medication.time ? parseTimeString(medication.time) : new Date()
+          );
+
+          setFrequency(medication.frequency || "1x a day");
+          setPrescribedAmt(medication.prescribedAmt || "");
+          setTakenDose(medication.takenDose || "");
+          setEnableRefill(medication.enableRefill || false);
+          setOnHandAmount(medication.onHandAmount || "");
+          setRefillThreshold(medication.refillThreshold || "");
+          setEnableAlarm(medication.enableAlarm || false);
+        } else {
+          Alert.alert("Error", "Medication not found.");
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error("Failed to fetch medication:", error);
+        Alert.alert("Error", "Failed to fetch medication.");
+      }
+    };
+
+    fetchMedication();
+  }, [medId]);
 
   const getIntervalFromFrequency = (freq) => {
     switch (freq) {
@@ -88,11 +119,10 @@ export default function AddMedication({ navigation }) {
       console.error("User not authenticated.");
       return;
     }
-    setCalculatedTimes(doseTimes);
     setShowConfirmModal(true);
   };
 
-  const confirmAndUpload = async () => {
+  const confirmAndUpdate = async () => {
     try {
       const user = auth.currentUser;
       if (!user) return;
@@ -110,6 +140,7 @@ export default function AddMedication({ navigation }) {
         name: medName,
         description,
         startDate: startDate.toDateString(),
+        startTime: startTime.toISOString(),
         frequency,
         intervalHours,
         prescribedAmt,
@@ -119,43 +150,14 @@ export default function AddMedication({ navigation }) {
         takenDose,
       };
 
-      const medsToAdd = doseTimes.map((time) => ({
-        ...baseMedData,
-        time: time.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        }),
-        isoTime: time.toISOString(),
-      }));
+      const medRef = doc(db, "medications", user.uid, "meds", medId);
+      await updateDoc(medRef, baseMedData);
 
-      try {
-        const userMedsCollection = collection(
-          db,
-          "medications",
-          user.uid,
-          "meds"
-        );
-
-        for (let med of medsToAdd) {
-          if (enableAlarm) {
-            const triggerTime = new Date(med.isoTime);
-            const hour = triggerTime.getHours();
-            const minute = triggerTime.getMinutes();
-            //await scheduleMedicationReminder(med.name, hour, minute);
-          }
-          await addDoc(userMedsCollection, med);
-        }
-        //
-        showToast("Medication doses saved successfully!");
-        navigation.goBack();
-      } catch (error) {
-        console.error("Error saving medication:", error);
-        Alert.alert("Upload failed", error.message || String(error));
-      }
-    } catch (e) {
-      console.error("Upload failed:", e);
-      Alert.alert("Error", "Something went wrong while saving.");
+      showToast("Medication updated successfully!");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error saving medication:", error);
+      Alert.alert("Upload failed", error.message || String(error));
     }
   };
 
@@ -165,7 +167,7 @@ export default function AddMedication({ navigation }) {
       style={{ flex: 1 }}
     >
       <View style={styles.customHeader}>
-        <Text style={styles.customHeaderTitle}>Add Medication</Text>
+        <Text style={styles.customHeaderTitle}>Edit Medication</Text>
       </View>
       <ScrollView
         contentContainerStyle={styles.container}
@@ -177,6 +179,7 @@ export default function AddMedication({ navigation }) {
           value={medName}
           onChangeText={setMedName}
         />
+
         <Text>Description / Notes:</Text>
         <TextInput
           style={styles.input}
@@ -184,6 +187,7 @@ export default function AddMedication({ navigation }) {
           onChangeText={setDescription}
           placeholder="Optional notes or description"
         />
+
         <Text>What date did/will you start?</Text>
         <Button
           title={startDate.toDateString()}
@@ -200,6 +204,7 @@ export default function AddMedication({ navigation }) {
             }}
           />
         )}
+
         <Text>What time did/will you start?</Text>
         <Button
           title={startTime.toLocaleTimeString([], {
@@ -221,22 +226,17 @@ export default function AddMedication({ navigation }) {
         )}
 
         <Text>Dose Frequency:</Text>
-        <DropDownPicker
-          open={open}
-          value={value}
-          items={items}
-          setOpen={setOpen}
-          setValue={(callback) => {
-            const selected = callback(value);
-            setValue(selected);
-            setFrequency(selected); // Sync immediately
-          }}
-          setItems={setItems}
-          placeholder="Select frequency"
-          zIndex={3000}
-          zIndexInverse={1000}
-        />
+        {["1x a day", "2x a day", "3x a day", "4x a day"].map((freq) => (
+          <Button
+            key={freq}
+            title={freq}
+            color={frequency === freq ? "green" : "gray"}
+            onPress={() => setFrequency(freq)}
+          />
+        ))}
+
         <Text>Interval: Every {getIntervalFromFrequency(frequency)} hours</Text>
+
         <Text>Prescribed Amount of Drug (optional):</Text>
         <TextInput
           style={styles.input}
@@ -244,6 +244,7 @@ export default function AddMedication({ navigation }) {
           value={prescribedAmt}
           onChangeText={setPrescribedAmt}
         />
+
         <View style={styles.switchRow}>
           <Text>Enable refill stock reminder?</Text>
           <Switch value={enableRefill} onValueChange={setEnableRefill} />
@@ -266,10 +267,12 @@ export default function AddMedication({ navigation }) {
             />
           </>
         )}
+
         <View style={styles.switchRow}>
           <Text>Enable alarm reminder?</Text>
           <Switch value={enableAlarm} onValueChange={setEnableAlarm} />
         </View>
+
         <Text>Dose already taken? (optional)</Text>
         <TextInput
           style={styles.input}
@@ -277,13 +280,15 @@ export default function AddMedication({ navigation }) {
           onChangeText={setTakenDose}
           placeholder="E.g. 2 doses taken already"
         />
+
         <View style={{ marginTop: 20 }}>
-          <Button title="Save Medication" onPress={handleSave} />
+          <Button title="Save Changes" onPress={handleSave} />
         </View>
+
         <Modal
           visible={showConfirmModal}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -296,7 +301,7 @@ export default function AddMedication({ navigation }) {
                   })}
                 </Text>
               ))}
-              <Button title="Confirm and Save" onPress={confirmAndUpload} />
+              <Button title="Confirm and Save" onPress={confirmAndUpdate} />
               <Button
                 title="Cancel"
                 onPress={() => setShowConfirmModal(false)}
@@ -321,11 +326,10 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     backgroundColor: "#FE8EDB",
     alignItems: "center",
-
     paddingVertical: 15,
     paddingHorizontal: 20,
-    elevation: 9, // Android shadow
-    shadowColor: "#000", // iOS shadow
+    elevation: 9,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 9 },
     shadowOpacity: 2,
     shadowRadius: 7,

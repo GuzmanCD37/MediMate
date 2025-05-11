@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Button,
+  RefreshControl,
 } from "react-native";
 import * as Notifications from "expo-notifications";
 
@@ -42,10 +43,25 @@ export default function HomeScreen() {
   const [patientId, setPatientId] = useState("");
   const [selectedMed, setSelectedMed] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const user = auth.currentUser;
   const navigation = useNavigation();
   const route = useRoute();
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log("✅ Cleared all scheduled notifications.");
+      // Re-trigger the data listener by manually calling the snapshot subscription logic if needed.
+      // Or simply rely on the listener in useEffect to repopulate notifications next cycle.
+    } catch (err) {
+      console.error("❌ Failed to clear notifications:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -133,16 +149,14 @@ export default function HomeScreen() {
           reminderTime.setSeconds(0);
           reminderTime.setMilliseconds(0);
 
+          /* schedule after render
           try {
             await scheduleMedicationReminder(med.name, hour, minute);
-            console.log(
-              `xxxxScheduled notification for ${med.name} {hour: ${hour}, minute: ${minute}}`
-            );
-            console.log(reminderTime.setHours(reminderTime.setSeconds(0)));
             scheduledMedIds.add(med.id);
           } catch (err) {
             console.error("Failed to schedule notification:", err);
           }
+          */
         }
       }
 
@@ -275,8 +289,8 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={() => markAsTaken(item.id)}>
               <Ionicons
                 name="checkmark-circle"
-                size={24}
-                color={item.taken ? "green" : "gray"}
+                size={30}
+                color={item.taken ? "#60CD01" : "gray"}
               />
             </TouchableOpacity>
           </>
@@ -340,11 +354,47 @@ export default function HomeScreen() {
         renderSectionHeader={({ section: { title } }) => (
           <Text style={styles.sectionHeader}>{formatTo12Hour(title)}</Text>
         )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
 
       <Modal visible={modalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
+            {/* Top Buttons */}
+            <View style={styles.modalTopButtons}>
+              {/* Edit button (top-left) */}
+              <TouchableOpacity
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate("EditMedication", {
+                    medId: selectedMed.id,
+                  });
+                }}
+                style={{ position: "absolute", top: 10, left: 10 }}
+              >
+                <Ionicons name="create-outline" size={26} color="#007bff" />
+              </TouchableOpacity>
+
+              {/* Delete button (top-right, before close) */}
+              <TouchableOpacity
+                onPress={() => confirmDelete(selectedMed.name)}
+                style={{ position: "absolute", top: 10, left: 45 }}
+              >
+                <Ionicons name="trash-outline" size={23} color="red" />
+              </TouchableOpacity>
+
+              {/* Close button (top-right) */}
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={{ position: "absolute", top: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={28} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Medication Info */}
             {selectedMed && (
               <>
                 <Text style={styles.modalTitle}>{selectedMed.name}</Text>
@@ -355,12 +405,66 @@ export default function HomeScreen() {
                   <Text>Interval: {selectedMed.interval}</Text>
                 )}
                 <Text>Amount on-hand: {selectedMed.onHandAmount} pcs</Text>
-                <Button title="Close" onPress={() => setModalVisible(false)} />
-                <Button
-                  title="Delete"
-                  color="red"
-                  onPress={() => confirmDelete(selectedMed.name)}
-                />
+
+                {/* Bottom Action Buttons */}
+                <View style={[styles.modalActions]}>
+                  <View style={styles.circleButtonContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.circleButton,
+                        selectedMed.taken && { backgroundColor: "#60CD01" },
+                      ]}
+                      onPress={() => {
+                        markAsTaken(selectedMed.id);
+                      }}
+                    >
+                      <Ionicons name="checkmark" size={24} color="white" />
+                    </TouchableOpacity>
+                    <Text style={styles.circleLabel}>Taken</Text>
+                  </View>
+
+                  <View style={styles.circleButtonContainer}>
+                    <TouchableOpacity
+                      style={styles.circleButton}
+                      onPress={() => {
+                        updateDoc(
+                          doc(
+                            db,
+                            "medications",
+                            auth.currentUser.uid,
+                            "meds",
+                            selectedMed.id
+                          ),
+                          {
+                            taken: false,
+                            skipped: true,
+                          }
+                        );
+                        showToast("Medication marked as skipped/missed.");
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Ionicons name="close" size={24} color="white" />
+                    </TouchableOpacity>
+                    <Text style={styles.circleLabel}>Skip</Text>
+                  </View>
+
+                  {selectedMed.refillReminder && (
+                    <View style={styles.circleButtonContainer}>
+                      <TouchableOpacity
+                        style={styles.circleButton}
+                        onPress={() => {
+                          // Refill logic here
+                          showToast("Refill button clicked");
+                          setModalVisible(false);
+                        }}
+                      >
+                        <Ionicons name="repeat" size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text style={styles.circleLabel}>Refill</Text>
+                    </View>
+                  )}
+                </View>
               </>
             )}
           </View>
@@ -438,7 +542,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: "#fff",
-    padding: 20,
+    padding: 15,
     borderRadius: 10,
     width: "80%",
   },
@@ -446,5 +550,34 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
+  },
+  modalTopButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 40,
+    padding: 5,
+    marginTop: -10,
+    marginLeft: -10,
+    marginRight: -10,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 20,
+  },
+  circleButtonContainer: {
+    alignItems: "center",
+  },
+  circleButton: {
+    backgroundColor: "#007bff",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  circleLabel: {
+    marginTop: 5,
+    fontSize: 12,
   },
 });

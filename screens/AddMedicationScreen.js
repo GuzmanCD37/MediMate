@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { scheduleMedicationReminder } from "../utils/notifications"; // Adjust the import path as needed
 import { auth, db } from "../firebase";
 import {
   doc,
@@ -40,7 +41,7 @@ export default function AddMedication({ navigation }) {
   const [enableRefill, setEnableRefill] = useState(false);
   const [onHandAmount, setOnHandAmount] = useState("");
   const [refillThreshold, setRefillThreshold] = useState("");
-  const [enableAlarm, setEnableAlarm] = useState(false);
+  const [enableAlarm, setEnableAlarm] = useState(true);
   const [takenDose, setTakenDose] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [calculatedTimes, setCalculatedTimes] = useState([]);
@@ -143,7 +144,7 @@ export default function AddMedication({ navigation }) {
             const triggerTime = new Date(med.isoTime);
             const hour = triggerTime.getHours();
             const minute = triggerTime.getMinutes();
-            //await scheduleMedicationReminder(med.name, hour, minute);
+            await scheduleMedicationReminder(med.name, hour, minute);
           }
           await addDoc(userMedsCollection, med);
         }
@@ -168,8 +169,8 @@ export default function AddMedication({ navigation }) {
       <View style={styles.customHeader}>
         <Text style={styles.customHeaderTitle}>Add Medication</Text>
       </View>
-      <ScrollView
-        contentContainerStyle={styles.container}
+      <View
+        style={styles.container}
         keyboardShouldPersistTaps="handled"
       >
         <Text>Name:</Text>
@@ -215,14 +216,14 @@ export default function AddMedication({ navigation }) {
             value={startTime}
             mode="time"
             display="spinner"
-            s
+            
             onChange={(e, t) => {
               setShowTimePicker(false);
               if (t) setStartTime(t);
             }}
           />
         )}
-
+        <Text></Text>
         <Text>Dose Frequency:</Text>
         <DropDownPicker
           open={open}
@@ -240,7 +241,7 @@ export default function AddMedication({ navigation }) {
           zIndexInverse={1000}
         />
         <Text>Interval: Every {getIntervalFromFrequency(frequency)} hours</Text>
-
+        <Text></Text>
         <Text>Prescribed Amount of Drug (optional):</Text>
         <TextInput
           style={styles.input}
@@ -292,7 +293,7 @@ export default function AddMedication({ navigation }) {
             </View>
           </View>
         </Modal>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     paddingBottom: 80,
-    flexGrow: 1,
+    flex: 1,
   },
   customHeader: {
     marginTop: 30,

@@ -6,11 +6,12 @@ import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../firebase"; // Adjust path if needed
-import { doc, updateDoc } from "firebase/firestore";
+import { getDoc, doc, updateDoc } from "firebase/firestore";
 
 export default function QrScanner({ route }) {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
+  const [fullName, setFullName] = useState("");
   const cameraRef = useRef(null);
   const navigation = useNavigation();
 
@@ -59,22 +60,39 @@ export default function QrScanner({ route }) {
 
   const handleBarCodeScanned = async ({ data }) => {
     setScanned(true);
-
+  
     try {
       const caregiverUID = auth.currentUser.uid;
       const caregiverRef = doc(db, "users", caregiverUID);
+  
+      // Fetch patient info
+      const patientRef = doc(db, "users", data);
+      const patientSnap = await getDoc(patientRef);
+  
+      if (!patientSnap.exists()) {
+        console.error("Patient not found in Firestore.");
+        return;
+      }
+  
+      const patientData = patientSnap.data();
+      const fullName = `${patientData.firstName} ${patientData.lastName}`;
+  
+      setFullName(fullName);
+      console.log("Full name set:", fullName);
 
+      // Update caregiver document with tracked patient info
       await updateDoc(caregiverRef, {
         trackedPatientId: data,
+        trackedPatientFullName: fullName,
       });
-
-      console.log("Scanned UID saved to Firestore:", data);
-
-      navigation.navigate("Drawer"); // or "Home" if that's your main screen
+  
+      console.log("Scanned UID and name saved to Firestore:", data, fullName);
+      navigation.navigate("Drawer");
     } catch (error) {
       console.error("Error saving scanned UID:", error);
     }
   };
+
   return (
     <SafeAreaView style={styles.container}>
       <CameraView

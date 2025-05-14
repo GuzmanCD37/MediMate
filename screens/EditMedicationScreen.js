@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import DropDownPicker from "react-native-dropdown-picker";
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
@@ -36,6 +37,15 @@ export default function EditMedication({ navigation, route }) {
   const [calculatedTimes, setCalculatedTimes] = useState([]);
 
   const { medId } = route.params;
+
+  const [items, setItems] = useState([
+    { label: "1x a day", value: "1x a day" },
+    { label: "2x a day", value: "2x a day" },
+    { label: "3x a day", value: "3x a day" },
+    { label: "4x a day", value: "4x a day" },
+  ]);
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(frequency);
 
   useEffect(() => {
     const fetchMedication = async () => {
@@ -226,14 +236,21 @@ export default function EditMedication({ navigation, route }) {
         )}
 
         <Text>Dose Frequency:</Text>
-        {["1x a day", "2x a day", "3x a day", "4x a day"].map((freq) => (
-          <Button
-            key={freq}
-            title={freq}
-            color={frequency === freq ? "green" : "gray"}
-            onPress={() => setFrequency(freq)}
-          />
-        ))}
+        <DropDownPicker
+          open={open}
+          value={value}
+          items={items}
+          setOpen={setOpen}
+          setValue={(callback) => {
+            const selected = callback(value);
+            setValue(selected);
+            setFrequency(selected); // Sync immediately
+          }}
+          setItems={setItems}
+          placeholder="Select frequency"
+          zIndex={3000}
+          zIndexInverse={1000}
+        />
 
         <Text>Interval: Every {getIntervalFromFrequency(frequency)} hours</Text>
 
@@ -322,6 +339,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   customHeader: {
+    marginTop: 30,
     paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: "#FE8EDB",
@@ -346,6 +364,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginVertical: 10,
     borderRadius: 5,
+    backgroundColor: "white",
   },
   switchRow: {
     flexDirection: "row",

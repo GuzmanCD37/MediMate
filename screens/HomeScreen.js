@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import * as Notifications from "expo-notifications";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registerForPushNotifications } from "../utils/RegisterPushToken"; // Adjust the import path as necessary
 import { scheduleMedicationReminder } from "../utils/notifications"; // Adjust the import path as necessary
 import { sendMedicationNotification } from "../utils/SendNotification"; // Adjust the import path as necessary
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -39,6 +41,7 @@ import {
 
 export default function HomeScreen() {
   const [role, setRole] = useState(null);
+  const [username, setUsername] = useState("");
   const [meds, setMeds] = useState([]);
   const [patientId, setPatientId] = useState("");
   const [selectedMed, setSelectedMed] = useState(null);
@@ -79,14 +82,35 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const fetchRole = async () => {
-      const docSnap = await getDoc(doc(db, "users", user.uid));
-      if (docSnap.exists()) setRole(docSnap.data().role);
-    };
+      const userRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(userRef);
+      try {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setRole(data.role);
+          setUsername(data.firstName);
+          console.log("User name fetcheddddd:", data.firstName);
 
-    if (user) {
-      fetchRole();
-    }
-  }, [user]);
+          // 👇 Set patientId if user is a caregiver
+          if (data.role === "caregiver" && data.trackedPatientId) {
+            setPatientId(data.trackedPatientId);
+            console.log(
+              "Tracked patient ID set from Firestore:",
+              data.trackedPatientId
+            );
+          }
+
+          // 👇 Set patientId if user is a patient
+          if (data.role === "patient") {
+            setPatientId(user.uid);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+      }
+    };
+    fetchRole();
+  }, [role, user.uid]);
 
   useEffect(() => {
     // Assuming `patientId` is the ID of the logged-in patient
@@ -176,14 +200,6 @@ export default function HomeScreen() {
 
     return unsubscribe;
   }, [role, patientId]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (route.params?.scannedUID) {
-        setPatientId(route.params?.scannedUID);
-      }
-    }, [route.params?.scannedUID])
-  );
 
   const markAsTaken = async (medId) => {
     const targetUID = role === "caregiver" ? patientId : user.uid;
@@ -321,7 +337,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Welcome {role}</Text>
+      <Text style={styles.title}>Welcome {username}</Text>
 
       {role === "patient" && (
         <TouchableOpacity
@@ -407,64 +423,65 @@ export default function HomeScreen() {
                 <Text>Amount on-hand: {selectedMed.onHandAmount} pcs</Text>
 
                 {/* Bottom Action Buttons */}
-                <View style={[styles.modalActions]}>
-                  <View style={styles.circleButtonContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.circleButton,
-                        selectedMed.taken && { backgroundColor: "#60CD01" },
-                      ]}
-                      onPress={() => {
-                        markAsTaken(selectedMed.id);
-                      }}
-                    >
-                      <Ionicons name="checkmark" size={24} color="white" />
-                    </TouchableOpacity>
-                    <Text style={styles.circleLabel}>Taken</Text>
-                  </View>
+                {role === "patient" && (
+                  <View style={[styles.modalActions]}>
+                    <View style={styles.circleButtonContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.circleButton,
+                          selectedMed.taken && { backgroundColor: "#60CD01" },
+                        ]}
+                        onPress={() => {
+                          markAsTaken(selectedMed.id);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text style={styles.circleLabel}>Taken</Text>
+                    </View>
 
-                  <View style={styles.circleButtonContainer}>
-                    <TouchableOpacity
-                      style={styles.circleButton}
-                      onPress={() => {
-                        updateDoc(
-                          doc(
-                            db,
-                            "medications",
-                            auth.currentUser.uid,
-                            "meds",
-                            selectedMed.id
-                          ),
-                          {
-                            taken: false,
-                            skipped: true,
-                          }
-                        );
-                        showToast("Medication marked as skipped/missed.");
-                        setModalVisible(false);
-                      }}
-                    >
-                      <Ionicons name="close" size={24} color="white" />
-                    </TouchableOpacity>
-                    <Text style={styles.circleLabel}>Skip</Text>
-                  </View>
-
-                  {selectedMed.refillReminder && (
                     <View style={styles.circleButtonContainer}>
                       <TouchableOpacity
                         style={styles.circleButton}
                         onPress={() => {
-                          // Refill logic here
-                          showToast("Refill button clicked");
+                          updateDoc(
+                            doc(
+                              db,
+                              "medications",
+                              auth.currentUser.uid,
+                              "meds",
+                              selectedMed.id
+                            ),
+                            {
+                              taken: false,
+                              skipped: true,
+                            }
+                          );
+                          showToast("Medication marked as skipped/missed.");
                           setModalVisible(false);
                         }}
                       >
-                        <Ionicons name="repeat" size={24} color="white" />
+                        <Ionicons name="close" size={24} color="white" />
                       </TouchableOpacity>
-                      <Text style={styles.circleLabel}>Refill</Text>
+                      <Text style={styles.circleLabel}>Skip</Text>
                     </View>
-                  )}
-                </View>
+
+                    {selectedMed.refillReminder && (
+                      <View style={styles.circleButtonContainer}>
+                        <TouchableOpacity
+                          style={styles.circleButton}
+                          onPress={() => {
+                            showToast("Refill button clicked");
+                            setModalVisible(false);
+                          }}
+                        >
+                          <Ionicons name="repeat" size={24} color="white" />
+                        </TouchableOpacity>
+                        <Text style={styles.circleLabel}>Refill</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </>
             )}
           </View>

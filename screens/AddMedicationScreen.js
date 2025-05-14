@@ -1,5 +1,6 @@
 //AddMedicationScreen.js
 import React, { useState, useMemo, useEffect } from "react";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import DropDownPicker from "react-native-dropdown-picker";
 import {
   View,
@@ -171,10 +172,11 @@ export default function AddMedication({ navigation }) {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text>Medicine Name:</Text>
+        <Text>Name:</Text>
         <TextInput
           style={styles.input}
           value={medName}
+          placeholder="Febuxostat, etc."
           onChangeText={setMedName}
         />
         <Text>Description / Notes:</Text>
@@ -184,7 +186,7 @@ export default function AddMedication({ navigation }) {
           onChangeText={setDescription}
           placeholder="Optional notes or description"
         />
-        <Text>What date did/will you start?</Text>
+        <Text>Start Date:</Text>
         <Button
           title={startDate.toDateString()}
           onPress={() => setShowDatePicker(true)}
@@ -200,7 +202,7 @@ export default function AddMedication({ navigation }) {
             }}
           />
         )}
-        <Text>What time did/will you start?</Text>
+        <Text>Start time:</Text>
         <Button
           title={startTime.toLocaleTimeString([], {
             hour: "2-digit",
@@ -213,6 +215,7 @@ export default function AddMedication({ navigation }) {
             value={startTime}
             mode="time"
             display="spinner"
+            s
             onChange={(e, t) => {
               setShowTimePicker(false);
               if (t) setStartTime(t);
@@ -237,6 +240,7 @@ export default function AddMedication({ navigation }) {
           zIndexInverse={1000}
         />
         <Text>Interval: Every {getIntervalFromFrequency(frequency)} hours</Text>
+
         <Text>Prescribed Amount of Drug (optional):</Text>
         <TextInput
           style={styles.input}
@@ -244,36 +248,11 @@ export default function AddMedication({ navigation }) {
           value={prescribedAmt}
           onChangeText={setPrescribedAmt}
         />
-        <View style={styles.switchRow}>
-          <Text>Enable refill stock reminder?</Text>
-          <Switch value={enableRefill} onValueChange={setEnableRefill} />
-        </View>
-        {enableRefill && (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Amount on hand"
-              keyboardType="numeric"
-              value={onHandAmount}
-              onChangeText={setOnHandAmount}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Remind when amount is below..."
-              keyboardType="numeric"
-              value={refillThreshold}
-              onChangeText={setRefillThreshold}
-            />
-          </>
-        )}
-        <View style={styles.switchRow}>
-          <Text>Enable alarm reminder?</Text>
-          <Switch value={enableAlarm} onValueChange={setEnableAlarm} />
-        </View>
         <Text>Dose already taken? (optional)</Text>
         <TextInput
           style={styles.input}
           value={takenDose}
+          keyboardType="numeric"
           onChangeText={setTakenDose}
           placeholder="E.g. 2 doses taken already"
         />
@@ -287,15 +266,23 @@ export default function AddMedication({ navigation }) {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={{ fontWeight: "bold" }}>Confirm Dose Times:</Text>
-              {calculatedTimes.map((time, index) => (
-                <Text key={index}>
-                  {time.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
-              ))}
+              <Text style={{ fontWeight: "bold", fontSize: 19 }}>
+                Confirm Dose Times:
+              </Text>
+
+              <View style={{ marginBottom: 20, marginTop: 10 }}>
+                {calculatedTimes.map((time, index) => (
+                  <Text key={index} style={{ fontSize: 16, marginVertical: 3 }}>
+                    <Ionicons name="time-outline" size={24} color="black" />
+
+                    {time.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                ))}
+              </View>
+
               <Button title="Confirm and Save" onPress={confirmAndUpload} />
               <Button
                 title="Cancel"
@@ -317,6 +304,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   customHeader: {
+    marginTop: 30,
     paddingTop: 20,
     paddingBottom: 20,
     backgroundColor: "#FE8EDB",

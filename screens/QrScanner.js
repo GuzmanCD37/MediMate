@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Button } from "react-native";
 import { Camera } from "expo-camera"; // Import expo-camera
-//import * as ImagePicker from "expo-image-picker"; // Import expo-image-picker
-import QRCodeLocalImage from "react-native-qrcode-local-image";
+//import ImagePicker from "expo-image-picker"; // Import expo-image-picker
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auth, db } from "../firebase"; // Adjust path if needed
+import { doc, updateDoc } from "firebase/firestore";
 
 export default function QrScanner({ route }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -30,30 +31,49 @@ export default function QrScanner({ route }) {
   }
 
   const uploadQR = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-
-      QRCodeLocalImage.decode(imageUri, (err, decoded) => {
-        if (err) {
-          alert("Failed to read QR code.");
-          console.error(err);
-          return;
-        }
-
-        console.log("Decoded QR:", decoded);
-        navigation.navigate("Drawer", { scannedUID: decoded });
+    console.log("Upload QR pressed");
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
       });
+
+      if (!result.canceled) {
+        const imageUri = result.assets[0].uri;
+
+        QRCodeLocalImage.decode(imageUri, (err, decoded) => {
+          if (err) {
+            alert("Failed to read QR code.");
+            console.error(err);
+            return;
+          }
+
+          console.log("Decoded QR:", decoded);
+          navigation.navigate("Drawer", { scannedUID: decoded });
+        });
+      }
+    } catch (error) {
+      console.error("Error reading QR code:", error);
     }
   };
 
-  const handleBarCodeScanned = ({ data }) => {
+  const handleBarCodeScanned = async ({ data }) => {
     setScanned(true);
-    navigation.navigate("Drawer", { scannedUID: data });
+
+    try {
+      const caregiverUID = auth.currentUser.uid;
+      const caregiverRef = doc(db, "users", caregiverUID);
+
+      await updateDoc(caregiverRef, {
+        trackedPatientId: data,
+      });
+
+      console.log("Scanned UID saved to Firestore:", data);
+
+      navigation.navigate("Drawer"); // or "Home" if that's your main screen
+    } catch (error) {
+      console.error("Error saving scanned UID:", error);
+    }
   };
   return (
     <SafeAreaView style={styles.container}>
@@ -74,7 +94,6 @@ export default function QrScanner({ route }) {
               onPress={() => setScanned(false)}
             />
           )}
-          <Button title="Upload QR from Gallery" onPress={uploadQR} />
         </View>
       </CameraView>
     </SafeAreaView>
@@ -95,7 +114,7 @@ const styles = StyleSheet.create({
   scanBox: {
     width: 250,
     height: 250,
-    borderColor: "#white", // Green outline
+    borderColor: "white", // Green outline
     borderWidth: 4,
     borderRadius: 10,
     marginBottom: 20,

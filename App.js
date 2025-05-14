@@ -85,7 +85,6 @@ export async function checkIfStillActive(medId) {
 }
 
 export default function App() {
-  <StatusBar style={{ BackgroundColor: "black" }} />;
   useEffect(() => {
     registerForPushNotificationsAsync();
   }, []);
@@ -174,6 +173,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
+      <StatusBar backgroundColor="black" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />

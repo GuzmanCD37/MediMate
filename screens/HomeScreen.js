@@ -91,7 +91,7 @@ export default function HomeScreen() {
           const data = docSnap.data();
           setRole(data.role);
           setUsername(data.firstName);
-          
+
           console.log("User full name fetcheddddd:", fullname);
 
           // 👇 Set patientId if user is a caregiver
@@ -100,7 +100,8 @@ export default function HomeScreen() {
             setPatientFullname(data.trackedPatientFullName); // Assuming you have this field in Firestore
             console.log(
               "Tracked patient ID set from Firestore:",
-              data.trackedPatientId, data.trackedPatientFullname
+              data.trackedPatientId,
+              data.trackedPatientFullname
             );
           }
 
@@ -216,7 +217,6 @@ export default function HomeScreen() {
         const data = medSnap.data();
         const isTaken = data.taken === true;
 
-
         await updateDoc(medRef, {
           taken: !isTaken,
         });
@@ -227,8 +227,6 @@ export default function HomeScreen() {
             : "Medication reverted to untaken."
         );
       }
-
-
     } catch (error) {
       console.error("Error toggling medication:", error);
       showToast("Failed to update medication.");
@@ -297,7 +295,8 @@ export default function HomeScreen() {
       <View style={{ flex: 1 }}>
         <Text style={styles.medItemText}>{item.name}</Text>
         <Text style={styles.stockText}>
-          Status: {item.taken ? "Taken" : item.skipped ? "Skipped/Missed" : "Not Taken"}
+          Status:{" "}
+          {item.taken ? "Taken" : item.skipped ? "Skipped/Missed" : "Not Taken"}
         </Text>
       </View>
       <View style={styles.actions}>
@@ -307,7 +306,9 @@ export default function HomeScreen() {
               <Ionicons
                 name={item.skipped ? "close-circle" : "checkmark-circle"}
                 size={30}
-                color={item.skipped ? "orange" : item.taken ? "#60CD01" : "grey"}
+                color={
+                  item.skipped ? "orange" : item.taken ? "#60CD01" : "grey"
+                }
               />
             </TouchableOpacity>
           </>
@@ -447,7 +448,6 @@ export default function HomeScreen() {
                     </View>
 
                     <View style={styles.circleButtonContainer}>
-
                       <TouchableOpacity
                         style={styles.circleButton}
                         onPress={async () => {
@@ -459,10 +459,11 @@ export default function HomeScreen() {
                               "meds",
                               selectedMed.id
                             );
-                            
+
                             const medSnap = await getDoc(medRef);
                             if (medSnap.exists()) {
-                              const currentSkipped = medSnap.data().skipped || false;
+                              const currentSkipped =
+                                medSnap.data().skipped || false;
                               const newSkipped = !currentSkipped;
 
                               await updateDoc(medRef, {
@@ -470,13 +471,18 @@ export default function HomeScreen() {
                                 taken: false, // optional: keep as false when skipping
                               });
 
-                              showToast(`Medication marked as ${newSkipped ? "skipped" : "not skipped"}.`);
+                              showToast(
+                                `Medication marked as ${newSkipped ? "skipped" : "not skipped"}.`
+                              );
                               setModalVisible(false);
                             } else {
                               console.error("Medication not found");
                             }
                           } catch (error) {
-                            console.error("Error toggling skipped value:", error);
+                            console.error(
+                              "Error toggling skipped value:",
+                              error
+                            );
                           }
                         }}
                       >
@@ -484,8 +490,8 @@ export default function HomeScreen() {
                       </TouchableOpacity>
 
                       <Text style={styles.circleLabel}>
-                        {selectedMed.skipped ? "Skipped" : "Skip" }
-                        </Text>
+                        {selectedMed.skipped ? "Skipped" : "Skip"}
+                      </Text>
                     </View>
 
                     {selectedMed.refillReminder && (

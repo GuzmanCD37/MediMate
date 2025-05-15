@@ -1,7 +1,6 @@
 //app.js
 import React, { useEffect } from "react";
-import { StatusBar } from "expo-status-bar";
-import { Platform } from "react-native";
+import { Platform, StatusBar } from "react-native";
 import * as Notifications from "expo-notifications";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";

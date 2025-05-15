@@ -1,4 +1,4 @@
-// utils/pushNotifications.js
+// utils/RegisterPushToken.js
 import * as Notifications from "expo-notifications";
 import { setDoc, doc } from "firebase/firestore";
 import { db } from "../firebase"; // Adjust the import path if necessary

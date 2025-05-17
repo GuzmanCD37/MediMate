@@ -43,7 +43,7 @@ export default function HomeScreen() {
   const [role, setRole] = useState(null);
   const [username, setUsername] = useState("");
   const [fullname, setFullname] = useState("");
-  const [patientFullname, setPatientFullname] = useState("");
+  const [trackedPatientFullname, setTrackedPatientFullname] = useState("");
   const [meds, setMeds] = useState([]);
   const [patientId, setPatientId] = useState("");
   const [selectedMed, setSelectedMed] = useState(null);
@@ -97,7 +97,7 @@ export default function HomeScreen() {
           // 👇 Set patientId if user is a caregiver
           if (data.role === "caregiver" && data.trackedPatientId) {
             setPatientId(data.trackedPatientId);
-            setPatientFullname(data.trackedPatientFullName); // Assuming you have this field in Firestore
+            setTrackedPatientFullname(data.trackedPatientFullName); // Assuming you have this field in Firestore
             console.log(
               "Tracked patient ID set from Firestore:",
               data.trackedPatientId,
@@ -341,16 +341,14 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Welcome {username}</Text>
 
-      {role === "patient" && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => {
-            navigation.navigate("AddMedication");
-          }}
-        >
-          <Ionicons name="add" size={30} color="#fff" />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => {
+          navigation.navigate("AddMedication");
+        }}
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
 
       {role === "caregiver" && (
         <>
@@ -360,7 +358,9 @@ export default function HomeScreen() {
           >
             <Text style={styles.buttonText}>Scan Patient QR Code</Text>
           </TouchableOpacity>
-          {patientId ? <Text>Tracking Patient: {fullname}</Text> : null}
+          {patientId ? (
+            <Text>Tracking Patient: {trackedPatientFullname}</Text>
+          ) : null}
         </>
       )}
 

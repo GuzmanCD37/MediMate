@@ -24,7 +24,7 @@ export async function sendMedicationNotification(patientUID, medName, time) {
     const message = {
       to: token,
       sound: "default",
-      title: "Medication Alert",
+      title: "Caregiver Alert",
       body: `Please take your medication: ${medName} at ${time}`,
     };
 

@@ -159,7 +159,8 @@ export default function App() {
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={{
           headerShown: true,
-          headerStyle: { backgroundColor: "#FE8EDB" },
+          headerStyle: { backgroundColor: "#007bff" },
+          headerTitleStyle: { color: "#fff", fontWeight: "bold", fontSize: 22 }, // <--- style here
         }}
       >
         <Drawer.Screen

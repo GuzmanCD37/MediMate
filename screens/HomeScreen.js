@@ -71,12 +71,16 @@ export default function HomeScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
-        <Ionicons
-          name="menu"
-          size={24}
-          style={{ marginLeft: 15 }}
-          onPress={() => navigation.openDrawer()}
-        />
+        <TouchableOpacity
+          onPress={() => navigation.toggleDrawer()}
+          style={{ marginLeft: 2 }}
+        >
+          <Ionicons
+            name="menu"
+            size={24}
+            style={{ marginLeft: 15, color: "white" }}
+          />
+        </TouchableOpacity>
       ),
       title: "  MediMate",
     });

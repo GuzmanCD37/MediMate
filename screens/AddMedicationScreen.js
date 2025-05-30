@@ -43,6 +43,29 @@ export default function AddMedication({ navigation }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [calculatedTimes, setCalculatedTimes] = useState([]);
 
+  const [role, setRole] = useState(null);
+  const [patientId, setPatientId] = useState(null);
+
+  useEffect(() => {
+    // Fetch user role and patientId if caregiver
+    const fetchUserRole = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setRole(data.role);
+        if (data.role === "caregiver" && data.trackedPatientId) {
+          setPatientId(data.trackedPatientId);
+        } else if (data.role === "patient") {
+          setPatientId(user.uid);
+        }
+      }
+    };
+    fetchUserRole();
+  }, []);
+
   const [items, setItems] = useState([
     { label: "1x a day", value: "1x a day" },
     { label: "2x a day", value: "2x a day" },
@@ -96,6 +119,9 @@ export default function AddMedication({ navigation }) {
       const user = auth.currentUser;
       if (!user) return;
 
+      const targetUID =
+        role === "caregiver" && patientId ? patientId : user.uid;
+
       const showToast = (message) => {
         if (Platform.OS === "android") {
           ToastAndroid.show(message, ToastAndroid.SHORT);
@@ -130,7 +156,7 @@ export default function AddMedication({ navigation }) {
         const userMedsCollection = collection(
           db,
           "medications",
-          user.uid,
+          targetUID,
           "meds"
         );
 

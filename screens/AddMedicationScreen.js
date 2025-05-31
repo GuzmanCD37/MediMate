@@ -331,7 +331,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     backgroundColor: "#FE8EDB",
     alignItems: "center",
-
     paddingVertical: 15,
     paddingHorizontal: 20,
     elevation: 9, // Android shadow

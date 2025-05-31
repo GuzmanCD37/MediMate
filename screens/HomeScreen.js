@@ -1,4 +1,3 @@
-//HomeScreen.js
 import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   View,
@@ -16,9 +15,11 @@ import {
 import * as Notifications from "expo-notifications";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { registerForPushNotifications } from "../utils/RegisterPushToken"; // Adjust the import path as necessary
-import { scheduleMedicationReminder } from "../utils/notifications"; // Adjust the import path as necessary
-import { sendMedicationNotification } from "../utils/SendNotification"; // Adjust the import path as necessary
+import { registerForPushNotifications } from "../utils/RegisterPushToken";
+import { scheduleMedicationReminder } from "../utils/notifications";
+import { sendMedicationNotification } from "../utils/SendNotification";
+import MarkAsTakenTimePicker from "../components/MarkAsTakenTimePicker"; // Corrected import path
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -42,12 +43,13 @@ import {
 export default function HomeScreen() {
   const [role, setRole] = useState(null);
   const [username, setUsername] = useState("");
-  const [fullname, setFullname] = useState("");
+  const [fullname, setFullname] = useState(""); // This state still seems unused
   const [trackedPatientFullname, setTrackedPatientFullname] = useState("");
   const [meds, setMeds] = useState([]);
   const [patientId, setPatientId] = useState("");
   const [selectedMed, setSelectedMed] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [isPickerVisible, setIsPickerVisible] = useState(false); // Controls visibility of the NEW MarkAsTakenTimePicker modal
+  const [modalVisible, setModalVisible] = useState(false); // Controls visibility of the main medication details modal
   const [refreshing, setRefreshing] = useState(false);
 
   const user = auth.currentUser;
@@ -59,8 +61,6 @@ export default function HomeScreen() {
       setRefreshing(true);
       await Notifications.cancelAllScheduledNotificationsAsync();
       console.log("✅ Cleared all scheduled notifications.");
-      // Re-trigger the data listener by manually calling the snapshot subscription logic if needed.
-      // Or simply rely on the listener in useEffect to repopulate notifications next cycle.
     } catch (err) {
       console.error("❌ Failed to clear notifications:", err);
     } finally {
@@ -82,7 +82,7 @@ export default function HomeScreen() {
           />
         </TouchableOpacity>
       ),
-      title: "  MediMate",
+      title: "   MediMate",
     });
   }, [navigation]);
 
@@ -96,12 +96,10 @@ export default function HomeScreen() {
           setRole(data.role);
           setUsername(data.firstName);
 
-          console.log("User full name fetcheddddd:", fullname);
-
-          // 👇 Set patientId if user is a caregiver
+          // Set patientId if user is a caregiver
           if (data.role === "caregiver" && data.trackedPatientId) {
             setPatientId(data.trackedPatientId);
-            setTrackedPatientFullname(data.trackedPatientFullName); // Assuming you have this field in Firestore
+            setTrackedPatientFullname(data.trackedPatientFullName);
             console.log(
               "Tracked patient ID set from Firestore:",
               data.trackedPatientId,
@@ -109,7 +107,7 @@ export default function HomeScreen() {
             );
           }
 
-          // 👇 Set patientId if user is a patient
+          // Set patientId if user is a patient
           if (data.role === "patient") {
             setPatientId(user.uid);
           }
@@ -122,16 +120,42 @@ export default function HomeScreen() {
   }, [role, user.uid]);
 
   useEffect(() => {
-    // Assuming `patientId` is the ID of the logged-in patient
     if (role === "patient" && patientId) {
       registerForPushNotifications(patientId);
       console.log("Push notifications registered for patient:", patientId);
     }
   }, [role, patientId]);
 
-  const formatTo12Hour = (time24) => {
-    const [hour, minute] = time24.split(":");
-    const h = parseInt(hour);
+  // Helper to format 24-hour time string or Date object to 12-hour
+  const formatTo12Hour = (timeInput) => {
+    if (!timeInput) return "";
+
+    let dateObj;
+    if (
+      typeof timeInput === "string" &&
+      timeInput.includes(":") &&
+      timeInput.length <= 5
+    ) {
+      // It's a "HH:MM" string
+      const [hour, minute] = timeInput.split(":");
+      dateObj = new Date(); // Use current date for simplicity, time will be set
+      dateObj.setHours(parseInt(hour));
+      dateObj.setMinutes(parseInt(minute));
+      dateObj.setSeconds(0);
+      dateObj.setMilliseconds(0);
+    } else {
+      // Assume it's an ISO string or Date object
+      dateObj = new Date(timeInput);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      // Check for invalid date
+      console.warn("Invalid date/time input to formatTo12Hour:", timeInput);
+      return timeInput; // Return original if invalid
+    }
+
+    const h = dateObj.getHours();
+    const minute = dateObj.getMinutes().toString().padStart(2, "0");
     const suffix = h >= 12 ? "PM" : "AM";
     const hour12 = h % 12 || 12;
     return `${hour12}:${minute} ${suffix}`;
@@ -144,7 +168,7 @@ export default function HomeScreen() {
 
     const q = query(
       collection(db, "medications", targetUID, "meds"),
-      orderBy("time") // sort by ISO time
+      orderBy("time")
     );
 
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
@@ -153,36 +177,24 @@ export default function HomeScreen() {
 
       for (const doc of querySnapshot.docs) {
         const med = { id: doc.id, ...doc.data() };
-        // Ensure med.time exists
         if (!med.time) {
           console.warn(
             `Skipping medication with ID ${med.id} as it doesn't have a time.`
           );
-          continue; // Skip this iteration if time is missing
+          continue;
         }
 
-        // Format time into readable format
-        const timeLabel =
-          med.time ||
-          new Date(med.isoTime).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          });
-
+        const timeLabel = med.time; // Group by the scheduled time
         if (!grouped[timeLabel]) grouped[timeLabel] = [];
         grouped[timeLabel].push(med);
 
-        // ✅ Schedule recurring alarm if enabled
+        // ✅ Schedule recurring alarm if enabled and not already scheduled for this session
+        // (You might want to refine this to only schedule if not already taken/skipped,
+        // and if it's due in the future, and add proper notification cancellation/rescheduling logic)
         if (med.enableAlarm && !scheduledMedIds.has(med.id)) {
           const [hour, minute] = med.time.split(":").map(Number);
-          const reminderTime = new Date();
-          reminderTime.setHours(hour);
-          reminderTime.setMinutes(minute);
-          reminderTime.setSeconds(0);
-          reminderTime.setMilliseconds(0);
-
-          /* schedule after render
+          // Example: schedule after render
+          /*
           try {
             await scheduleMedicationReminder(med.name, hour, minute);
             scheduledMedIds.add(med.id);
@@ -195,12 +207,13 @@ export default function HomeScreen() {
 
       const sections = Object.keys(grouped)
         .sort((a, b) => {
-          const d1 = new Date(`1970-01-01T${grouped[a][0].time}`);
-          const d2 = new Date(`1970-01-01T${grouped[b][0].time}`);
+          // Sort by the actual time string (HH:MM)
+          const d1 = new Date(`1970-01-01T${a}`);
+          const d2 = new Date(`1970-01-01T${b}`);
           return d1 - d2;
         })
         .map((time) => ({
-          title: time,
+          title: time, // The 24-hour time string
           data: grouped[time],
         }));
 
@@ -210,39 +223,79 @@ export default function HomeScreen() {
     return unsubscribe;
   }, [role, patientId]);
 
-  const markAsTaken = async (medId) => {
-    const targetUID = role === "caregiver" ? patientId : user.uid;
-    const medRef = doc(db, "medications", targetUID, "meds", medId);
-
-    try {
-      const medSnap = await getDoc(medRef);
-
-      if (medSnap.exists()) {
-        const data = medSnap.data();
-        const isTaken = data.taken === true;
-
-        await updateDoc(medRef, {
-          taken: !isTaken,
-        });
-
-        showToast(
-          !isTaken
-            ? "Medication marked as taken!"
-            : "Medication reverted to untaken."
-        );
-      }
-    } catch (error) {
-      console.error("Error toggling medication:", error);
-      showToast("Failed to update medication.");
-    }
-  };
-
   const showToast = (message) => {
     if (Platform.OS === "android") {
       ToastAndroid.show(message, ToastAndroid.SHORT);
     } else {
       Alert.alert("Success", message);
     }
+  };
+
+  // NEW: Function to handle confirming the taken time from the picker
+  const handleConfirmTakenTime = async (time) => {
+    setIsPickerVisible(false); // Hide the picker modal
+    //setModalVisible(true); // Re-open the main medication details modal
+
+    if (!selectedMed) return;
+
+    const targetUID = role === "caregiver" ? patientId : user.uid;
+    const medRef = doc(db, "medications", targetUID, "meds", selectedMed.id);
+
+    try {
+      const medSnap = await getDoc(medRef);
+      if (medSnap.exists()) {
+        const data = medSnap.data();
+        const isCurrentlyTaken = data.taken || false;
+
+        let updateData = {};
+
+        // If 'time' is explicitly null, it means we are untaking the medication
+        if (time === null) {
+          updateData = {
+            taken: false,
+            takenAt: null, // Clear takenAt timestamp
+            skipped: false, // Ensure not skipped if untaking
+          };
+          showToast("Medication reverted to untaken.");
+        } else if (isCurrentlyTaken) {
+          // If already taken, and a time is provided, treat it as an update to the taken time
+          // This path is less likely with the new "Now/Pick Time" choice,
+          // but good to keep for robustness if we were to allow editing the takenAt directly.
+          // For now, if "Taken" is pressed on an already taken med, it untakes.
+          // The `time` here would come from `MarkAsTakenTimePicker` if it was used for editing.
+          // If the user *mistakenly* pressed "Taken", they'd usually just press it again to untake.
+          // We'll primarily use the `time === null` path for untaking.
+          updateData = {
+            taken: true,
+            takenAt: time.toISOString(), // Store as ISO string
+            skipped: false,
+          };
+          showToast("Medication taken time updated!");
+        } else {
+          // If not taken, mark as taken with the specified time
+          updateData = {
+            taken: true,
+            takenAt: time.toISOString(), // Store as ISO string
+            skipped: false, // Cannot be skipped if taken
+          };
+          showToast("Medication marked as taken!");
+        }
+        await updateDoc(medRef, updateData);
+      } else {
+        console.warn("Medication not found for update:", selectedMed.id);
+        showToast("Failed to update medication: Not found.");
+      }
+    } catch (error) {
+      console.error("Error updating medication taken status:", error);
+      showToast("Failed to update medication.");
+    }
+  };
+
+  // Function to open the time picker modal
+  const openTakenTimePicker = (med) => {
+    setSelectedMed(med); // Set the medication to be acted upon
+    setIsPickerVisible(true); // Show the time picker modal
+    setModalVisible(false); // Hide the main modal when picker opens
   };
 
   const handleDeleteMedication = async (medName) => {
@@ -300,13 +353,30 @@ export default function HomeScreen() {
         <Text style={styles.medItemText}>{item.name}</Text>
         <Text style={styles.stockText}>
           Status:{" "}
-          {item.taken ? "Taken" : item.skipped ? "Skipped/Missed" : "Not Taken"}
+          {item.taken
+            ? `Taken at ${formatTo12Hour(item.takenAt || item.time)}` // Display takenAt or original time
+            : item.skipped
+              ? "Skipped/Missed"
+              : "Not Taken"}
         </Text>
       </View>
       <View style={styles.actions}>
         {role === "patient" && (
           <>
-            <TouchableOpacity onPress={() => markAsTaken(item.id)}>
+            {/* This button toggles the "Taken" status directly from the list view */}
+            <TouchableOpacity
+              onPress={() => {
+                if (item.taken) {
+                  // If already taken, allow untaking directly from list view
+                  // We pass null to handleConfirmTakenTime to signal untake
+                  setSelectedMed(item); // Ensure selectedMed is set for the handler
+                  handleConfirmTakenTime(null);
+                } else {
+                  // If not taken, open the "Now/Pick Time" picker
+                  openTakenTimePicker(item);
+                }
+              }}
+            >
               <Ionicons
                 name={item.skipped ? "close-circle" : "checkmark-circle"}
                 size={30}
@@ -381,6 +451,7 @@ export default function HomeScreen() {
         }
       />
 
+      {/* Main Medication Details Modal */}
       <Modal visible={modalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -432,6 +503,17 @@ export default function HomeScreen() {
                 {selectedMed.prescribedAmt && (
                   <Text>Prescribed Amount: {selectedMed.prescribedAmt}</Text>
                 )}
+                {selectedMed.taken && selectedMed.takenAt && (
+                  <Text
+                    style={{
+                      marginTop: 10,
+                      fontWeight: "bold",
+                      color: "#60CD01",
+                    }}
+                  >
+                    Taken At: {formatTo12Hour(selectedMed.takenAt)}
+                  </Text>
+                )}
 
                 {/* Bottom Action Buttons */}
                 {role === "patient" && (
@@ -443,7 +525,24 @@ export default function HomeScreen() {
                           selectedMed.taken && { backgroundColor: "#60CD01" },
                         ]}
                         onPress={() => {
-                          markAsTaken(selectedMed.id);
+                          if (selectedMed.taken) {
+                            // If already taken, allow untaking directly from modal
+                            Alert.alert(
+                              "Revert Medication",
+                              "Are you sure you want to mark this medication as untaken?",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Untake",
+                                  style: "destructive",
+                                  onPress: () => handleConfirmTakenTime(null), // Pass null to signal untake
+                                },
+                              ]
+                            );
+                          } else {
+                            // If not taken, open time picker
+                            openTakenTimePicker(selectedMed);
+                          }
                         }}
                       >
                         <Ionicons name="checkmark" size={24} color="white" />
@@ -453,13 +552,20 @@ export default function HomeScreen() {
 
                     <View style={styles.circleButtonContainer}>
                       <TouchableOpacity
-                        style={styles.circleButton}
+                        style={[
+                          styles.circleButton,
+                          selectedMed.skipped && { backgroundColor: "orange" },
+                        ]}
                         onPress={async () => {
                           try {
+                            const target =
+                              role === "caregiver"
+                                ? patientId
+                                : auth.currentUser.uid;
                             const medRef = doc(
                               db,
                               "medications",
-                              auth.currentUser.uid,
+                              target,
                               "meds",
                               selectedMed.id
                             );
@@ -472,7 +578,8 @@ export default function HomeScreen() {
 
                               await updateDoc(medRef, {
                                 skipped: newSkipped,
-                                taken: false, // optional: keep as false when skipping
+                                taken: false, // Ensure not taken if skipping
+                                takenAt: null, // Clear takenAt if skipping
                               });
 
                               showToast(
@@ -519,6 +626,20 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* MarkAsTakenTimePicker Modal - only visible when triggered */}
+      {isPickerVisible && selectedMed && (
+        <MarkAsTakenTimePicker
+          initialTime={
+            selectedMed.takenAt ? new Date(selectedMed.takenAt) : new Date()
+          }
+          onConfirm={handleConfirmTakenTime}
+          onCancel={() => {
+            setIsPickerVisible(false);
+            setModalVisible(true); // Re-open the main modal if the picker is cancelled
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -538,10 +659,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 20,
     right: 20,
-    backgroundColor: "#007bff", // Already here
+    backgroundColor: "#007bff",
     borderRadius: 30,
     padding: 15,
-    zIndex: 10, // Ensure it's on top
+    zIndex: 10,
   },
   button: {
     backgroundColor: "#007bff",
